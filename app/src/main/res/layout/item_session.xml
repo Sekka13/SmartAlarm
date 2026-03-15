@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/text_start_time"
+        android:text="Start"
+        android:textSize="16sp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/text_end_time"
+        android:text="End"
+        android:textSize="16sp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/text_bpm_min"
+        android:text="Min"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/text_bpm_max"
+        android:text="Max"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/text_bpm_avg"
+        android:text="Avg"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>
