@@ -1,44 +1,36 @@
 package com.example.smartalarm.domain.algorithm
 
-data class AlarmResult(
-    val shouldTrigger: Boolean,
-    val reason: String
-)
-
 object SmartAlarmAlgorithm {
 
-    fun checkAlarm(
-        bpm: Int,
-        phase: String,
+    /**
+     * Decide si conviene disparar la alarma en este instante.
+     *
+     * Reglas:
+     * - Si aún no hemos entrado en la ventana, no despertamos
+     * - Dentro de la ventana, preferimos despertar en LIGHT o REM
+     * - Si ya hemos alcanzado la hora exacta de la alarma, despertamos sí o sí
+     */
+    fun shouldTrigger(
+        phase: SleepPhaseDetector.Phase,
         now: Long,
         alarmTime: Long,
-        window: Long
-    ): AlarmResult {
-
-        if (alarmTime == 0L) {
-            return AlarmResult(false, "Alarm not set")
+        alarmWindow: Long
+    ): Boolean {
+        if (alarmTime <= 0L || alarmTime == Long.MAX_VALUE) {
+            return false
         }
 
-        val windowStart = alarmTime - window
-        val windowEnd = alarmTime
+        val windowStart = alarmTime - alarmWindow
 
         if (now < windowStart) {
-            return AlarmResult(false, "Outside window")
+            return false
         }
 
-        if (now in windowStart..windowEnd) {
-
-            if (phase == "Light") {
-                return AlarmResult(true, "Optimal wake phase")
-            }
-
-            return AlarmResult(false, "Waiting optimal phase")
+        if (now >= alarmTime) {
+            return true
         }
 
-        if (now >= windowEnd) {
-            return AlarmResult(true, "Max alarm time reached")
-        }
-
-        return AlarmResult(false, "No trigger")
+        return phase == SleepPhaseDetector.Phase.LIGHT ||
+                phase == SleepPhaseDetector.Phase.WAKE
     }
 }

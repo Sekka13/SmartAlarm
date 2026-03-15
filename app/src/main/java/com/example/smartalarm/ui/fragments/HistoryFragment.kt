@@ -37,7 +37,7 @@ class HistoryFragment(
         buttonExportJson = view.findViewById(R.id.button_export_json)
 
         recycler.layoutManager = LinearLayoutManager(requireContext())
-        adapter = SessionAdapter(emptyList()) // ✅ Creamos el adapter solo una vez
+        adapter = SessionAdapter(emptyList())
         recycler.adapter = adapter
 
         loadSessions()
@@ -54,42 +54,25 @@ class HistoryFragment(
     }
 
     private fun loadSessions() {
-
         lifecycleScope.launch {
-
             val sessions = withContext(Dispatchers.IO) {
                 sleepRepo.getAll()
             }
-
-            adapter.setSessions(sessions) // ✅ Reemplaza la lista en vez de crear un adapter nuevo
+            adapter.setSessions(sessions)
         }
     }
 
     private fun exportCsv() {
-
         lifecycleScope.launch {
-
-            val sessions = withContext(Dispatchers.IO) {
-                sleepRepo.getAll()
-            }
-
-            withContext(Dispatchers.IO) {
-                exportRepo.exportCsv(requireContext(), sessions)
-            }
+            val sessions = withContext(Dispatchers.IO) { sleepRepo.getAll() }
+            withContext(Dispatchers.IO) { exportRepo.exportCsv(requireContext(), sessions) }
         }
     }
 
     private fun exportJson() {
-
         lifecycleScope.launch {
-
-            val sessions = withContext(Dispatchers.IO) {
-                sleepRepo.getAll()
-            }
-
-            withContext(Dispatchers.IO) {
-                exportRepo.exportJson(requireContext(), sessions)
-            }
+            val sessions = withContext(Dispatchers.IO) { sleepRepo.getAll() }
+            withContext(Dispatchers.IO) { exportRepo.exportJson(requireContext(), sessions) }
         }
     }
 }
