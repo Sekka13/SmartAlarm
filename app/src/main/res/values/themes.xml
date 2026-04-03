@@ -1,9 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.SmartAlarm" parent="Theme.AppCompat.Light.NoActionBar">
-        <!-- Personaliza colores aquí -->
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryDark">@color/purple_700</item>
-        <item name="colorAccent">@color/teal_200</item>
+
+    <style name="Theme.SmartAlarm" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="colorPrimary">@color/primary_lavender</item>
+        <item name="colorPrimaryVariant">@color/primary_lavender</item>
+        <item name="colorSecondary">@color/accent_gold</item>
+        <item name="colorSurface">@color/surface_dark</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="colorOnPrimary">@color/background_dark</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorOnSecondary">@color/background_dark</item>
+
+        <!-- Tema de los diálogos Material -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SmartAlarm.MaterialAlertDialog</item>
     </style>
+
+    <style name="ThemeOverlay.SmartAlarm.MaterialAlertDialog"
+        parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+
+        <item name="colorSurface">@color/surface_dark</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorPrimary">@color/primary_lavender</item>
+
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.SmartAlarm.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.SmartAlarm.DialogButton</item>
+
+        <item name="backgroundInsetStart">16dp</item>
+        <item name="backgroundInsetEnd">16dp</item>
+        <item name="backgroundInsetTop">16dp</item>
+        <item name="backgroundInsetBottom">16dp</item>
+
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.SmartAlarm.Dialog</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.SmartAlarm.Dialog</item>
+    </style>
+
+    <style name="ShapeAppearance.SmartAlarm.Dialog" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="Widget.SmartAlarm.DialogButton"
+        parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/primary_lavender</item>
+    </style>
+
 </resources>

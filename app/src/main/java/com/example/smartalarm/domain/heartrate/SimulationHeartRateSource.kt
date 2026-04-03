@@ -1,10 +1,17 @@
 package com.example.smartalarm.domain.heartrate
 
-import kotlinx.coroutines.*
+import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-class SimulationHeartRateSource : HeartRateSource {
+class SimulationHeartRateSource(
+    private val context: Context
+) : HeartRateSource {
 
     companion object {
         private const val REAL_DELAY_MS = 10L
@@ -24,7 +31,6 @@ class SimulationHeartRateSource : HeartRateSource {
         running = true
         index = 0
 
-        // cargar CSV solo una vez
         if (bpmSamples.isEmpty()) {
             bpmSamples = loadBpmFromCsv()
         }
@@ -33,7 +39,6 @@ class SimulationHeartRateSource : HeartRateSource {
 
         job = scope.launch {
             while (running && index < bpmSamples.size) {
-
                 delay(REAL_DELAY_MS)
 
                 simulatedTime += SIMULATED_STEP_MS
@@ -55,40 +60,35 @@ class SimulationHeartRateSource : HeartRateSource {
     }
 
     private fun loadBpmFromCsv(): List<Int> {
-
         val result = mutableListOf<Int>()
 
         try {
+            context.assets.open("hrb_sample_1.csv").use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { reader ->
 
-            val inputStream =
-                javaClass.classLoader?.getResourceAsStream("assets/hrb_sample_1.csv")
-                    ?: return emptyList()
+                    var inDataSection = false
 
-            val reader = BufferedReader(InputStreamReader(inputStream))
+                    reader.forEachLine { line ->
+                        val row = line.trim()
 
-            var inDataSection = false
+                        if (!inDataSection) {
+                            if (row.startsWith("Sample rate")) {
+                                inDataSection = true
+                            }
+                            return@forEachLine
+                        }
 
-            reader.forEachLine { line ->
+                        val parts = row.split(",")
 
-                val row = line.trim()
-
-                if (!inDataSection) {
-                    if (row.startsWith("Sample rate")) {
-                        inDataSection = true
-                    }
-                    return@forEachLine
-                }
-
-                val parts = row.split(",")
-
-                if (parts.size >= 3) {
-                    val bpm = parts[2].trim().toIntOrNull()
-                    if (bpm != null) {
-                        result.add(bpm)
+                        if (parts.size >= 3) {
+                            val bpm = parts[2].trim().toIntOrNull()
+                            if (bpm != null) {
+                                result.add(bpm)
+                            }
+                        }
                     }
                 }
             }
-
         } catch (e: Exception) {
             e.printStackTrace()
         }

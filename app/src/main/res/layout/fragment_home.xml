@@ -1,90 +1,190 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="20dp"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-    <TextView
-        android:id="@+id/text_duration"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/background_dark">
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Duration: --"
-        android:textSize="16sp"
-        android:paddingBottom="8dp" />
-    <TextView
-        android:id="@+id/text_current_time"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Current time: --"
-        android:textSize="16sp"
-        android:paddingBottom="8dp"/>
+        android:orientation="vertical"
+        android:padding="20dp">
 
-    <TextView
-        android:id="@+id/text_alarm_triggered_at"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Alarm triggered at: --"
-        android:textSize="16sp"
-        android:paddingBottom="16dp"/>
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
 
-    <TextView
-        android:id="@+id/text_bpm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="BPM: --"
-        android:textSize="20sp"
-        android:paddingBottom="8dp"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-    <TextView
-        android:id="@+id/text_phase"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Phase: --"
-        android:textSize="20sp"
-        android:paddingBottom="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SMART ALARM"
+                    android:textColor="@color/accent_gold"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:letterSpacing="0.08" />
 
-    <TextView
-        android:id="@+id/text_alarm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Alarm: OFF"
-        android:textSize="20sp"
-        android:paddingBottom="16dp"/>
+                <TextView
+                    android:id="@+id/text_alarm_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Alarm not configured"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/text_alarm_info"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Alarm not configured"
-        android:textSize="16sp"
-        android:paddingBottom="20dp"/>
+                <TextView
+                    android:id="@+id/text_alarm"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Alarm: OFF"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-    <Button
-        android:id="@+id/button_set_alarm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Set Alarm"/>
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
 
-    <Button
-        android:id="@+id/button_set_window"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Set Smart Window"
-        android:layout_marginTop="10dp"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-    <Button
-        android:id="@+id/button_start"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Start"
-        android:layout_marginTop="20dp"/>
+                <TextView
+                    android:id="@+id/text_current_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Current time: --"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
 
-    <com.example.smartalarm.ui.view.SleepChartView
-        android:id="@+id/sleep_chart"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="16dp" />
+                <TextView
+                    android:id="@+id/text_duration"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Duration: --"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
 
-</LinearLayout>
+                <TextView
+                    android:id="@+id/text_alarm_triggered_at"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Alarm triggered at: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/text_bpm"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="BPM: --"
+                    android:textColor="@android:color/white"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/text_phase"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Phase: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="18sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_set_alarm"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Set alarm"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/primary_lavender"
+                android:textColor="@color/background_dark"
+                app:cornerRadius="28dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_set_window"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="Set smart window"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/surface_dark_2"
+                android:textColor="@android:color/white"
+                app:cornerRadius="28dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_start"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="Start"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/accent_gold"
+                android:textColor="@color/background_dark"
+                app:cornerRadius="28dp" />
+        </LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
+
+            <com.example.smartalarm.ui.view.SleepChartView
+                android:id="@+id/sleep_chart"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp" />
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

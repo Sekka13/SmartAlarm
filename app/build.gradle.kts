@@ -66,7 +66,17 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.recyclerview)
 
+    // Navigation Component
+    val nav_version = "2.7.7"
+    implementation("androidx.navigation:navigation-fragment-ktx:$nav_version")
+    implementation("androidx.navigation:navigation-ui-ktx:$nav_version")
 
+    // Charts (MPAndroidChart para estadísticas)
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    //Timepicker de Alarma
+
+        implementation("io.github.ShawnLin013:number-picker:2.4.13")
 
 
 }

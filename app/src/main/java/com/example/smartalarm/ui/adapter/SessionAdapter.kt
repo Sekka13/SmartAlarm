@@ -8,7 +8,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.smartalarm.R
 import com.example.smartalarm.data.model.SleepSession
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class SessionAdapter(
     private var sessions: List<SleepSession>
@@ -31,13 +32,18 @@ class SessionAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val session = sessions[position]
 
-        // Convertimos timestamp a formato 12h AM/PM
-        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        val startTimeStr = sdf.format(Date(session.startTime))
-        val endTimeStr = sdf.format(Date(session.endTime))
+        val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-        holder.textStart.text = "Start: $startTimeStr"
-        holder.textEnd.text = "End: $endTimeStr"
+        val startDate = Date(session.startTime)
+        val endDate = Date(session.endTime)
+
+        holder.textStart.text =
+            "${dateFormat.format(startDate)} · Start ${timeFormat.format(startDate)}"
+
+        holder.textEnd.text =
+            "End ${timeFormat.format(endDate)}"
+
         holder.textMin.text = "Min: ${session.bpmMin}"
         holder.textMax.text = "Max: ${session.bpmMax}"
         holder.textAvg.text = "Avg: ${session.bpmAvg}"

@@ -7,7 +7,7 @@ object SmartAlarmAlgorithm {
      *
      * Reglas:
      * - Si aún no hemos entrado en la ventana, no despertamos
-     * - Dentro de la ventana, preferimos despertar en LIGHT o REM
+     * - Dentro de la ventana, preferimos despertar en LIGHT o WAKE
      * - Si ya hemos alcanzado la hora exacta de la alarma, despertamos sí o sí
      */
     fun shouldTrigger(

@@ -47,4 +47,3 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 
 kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp"}
 
-

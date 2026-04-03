@@ -8,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.smartalarm.R
+import com.example.smartalarm.data.db.AppDatabase
 import com.example.smartalarm.data.repository.ExportRepository
 import com.example.smartalarm.data.repository.SleepSessionRepository
 import com.example.smartalarm.ui.adapter.SessionAdapter
@@ -15,10 +16,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class HistoryFragment(
-    private val sleepRepo: SleepSessionRepository,
-    private val exportRepo: ExportRepository
-) : Fragment() {
+class HistoryFragment : Fragment() {
+
+    private lateinit var sleepRepo: SleepSessionRepository
+    private lateinit var exportRepo: ExportRepository
 
     private lateinit var recycler: RecyclerView
     private lateinit var buttonExportCsv: Button
@@ -31,7 +32,9 @@ class HistoryFragment(
     ): View {
 
         val view = inflater.inflate(R.layout.fragment_history, container, false)
-
+        val db = AppDatabase.getDatabase(requireContext())
+        sleepRepo = SleepSessionRepository(db.sleepSessionDao())
+        exportRepo = ExportRepository()
         recycler = view.findViewById(R.id.recycler_sessions)
         buttonExportCsv = view.findViewById(R.id.button_export_csv)
         buttonExportJson = view.findViewById(R.id.button_export_json)

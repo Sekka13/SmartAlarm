@@ -12,10 +12,9 @@ object SleepPhaseDetector {
     }
 
     private val bpmWindow = mutableListOf<Int>()
-
     // Número de muestras que queremos conservar.
-    // Con 5 ya tienes una ventana pequeña pero suficiente para una demo.
     private const val WINDOW_SIZE = 30
+    private const val MIN_SAMPLES_FOR_STABLE_CLASSIFICATION = 5
 
     fun detectPhase(bpm: Int): Phase {
 
@@ -26,7 +25,9 @@ object SleepPhaseDetector {
         if (bpmWindow.size > WINDOW_SIZE) {
             bpmWindow.removeAt(0)
         }
-
+        if (bpmWindow.size < MIN_SAMPLES_FOR_STABLE_CLASSIFICATION) {
+            return Phase.LIGHT
+        }
         // Media de BPM recientes.
         // Representa el nivel "normal" reciente del usuario.
         val avg = bpmWindow.average()

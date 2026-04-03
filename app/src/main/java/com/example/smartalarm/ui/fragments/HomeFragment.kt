@@ -1,8 +1,8 @@
 package com.example.smartalarm.ui.fragments
 
 import android.app.AlertDialog
-import android.app.TimePickerDialog
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,25 +11,28 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.smartalarm.R
+import com.example.smartalarm.data.db.AppDatabase
 import com.example.smartalarm.data.model.SleepSession
 import com.example.smartalarm.data.repository.SleepSessionRepository
 import com.example.smartalarm.domain.heartrate.HeartRateSource
 import com.example.smartalarm.domain.heartrate.SimulationHeartRateSource
 // import com.example.smartalarm.domain.heartrate.BleHeartRateSource
 import com.example.smartalarm.domain.session.SleepSessionManager
+import com.example.smartalarm.ui.view.SleepChartView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.shawnlin.numberpicker.NumberPicker
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.example.smartalarm.ui.view.SleepChartView
 
-class HomeFragment(
-    private val repository: SleepSessionRepository
-) : Fragment() {
+class HomeFragment : Fragment() {
+
+    private lateinit var repository: SleepSessionRepository
 
     // Cambia esta línea cuando quieras usar BLE real
-    private val source: HeartRateSource = SimulationHeartRateSource()
-    // private val source: HeartRateSource = BleHeartRateSource()
+    private lateinit var source: HeartRateSource
+    // private lateinit var source: HeartRateSource = BleHeartRateSource()
 
     private lateinit var textBpm: TextView
     private lateinit var textPhase: TextView
@@ -61,7 +64,6 @@ class HomeFragment(
     // Primer timestamp mostrado para calcular duración visible
     private var sessionStartDisplayTime: Long = 0L
 
-
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     override fun onCreateView(
@@ -70,7 +72,10 @@ class HomeFragment(
         savedInstanceState: Bundle?
     ): View {
         val view = inflater.inflate(R.layout.fragment_home, container, false)
+        val db = AppDatabase.getDatabase(requireContext())
+        repository = SleepSessionRepository(db.sleepSessionDao())
 
+        source = SimulationHeartRateSource(requireContext())
         textBpm = view.findViewById(R.id.text_bpm)
         textPhase = view.findViewById(R.id.text_phase)
         textAlarm = view.findViewById(R.id.text_alarm)
@@ -86,7 +91,7 @@ class HomeFragment(
 
         sessionManager = SleepSessionManager(
             repository = repository,
-            scope = viewLifecycleOwner.lifecycleScope
+            scope = lifecycleScope
         )
 
         setupButtons()
@@ -115,14 +120,70 @@ class HomeFragment(
     }
 
     private fun showAlarmPicker() {
-        val now = Calendar.getInstance()
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_time_picker, null)
 
-        TimePickerDialog(
-            requireContext(),
-            { _, hourOfDay, minute ->
+        val hourPicker = dialogView.findViewById<NumberPicker>(R.id.hourPicker)
+        val minutePicker = dialogView.findViewById<NumberPicker>(R.id.minutePicker)
+        val ampmPicker = dialogView.findViewById<NumberPicker>(R.id.ampmPicker)
+
+        minutePicker.setFormatter { value ->
+            String.format(Locale.getDefault(), "%02d", value)
+        }
+
+        val ampmValues = arrayOf("AM", "PM")
+
+        ampmPicker.minValue = 0
+        ampmPicker.maxValue = ampmValues.size - 1
+        ampmPicker.displayedValues = ampmValues
+        ampmPicker.wrapSelectorWheel = false
+
+        hourPicker.wrapSelectorWheel = true
+        minutePicker.wrapSelectorWheel = true
+
+        val calendar = Calendar.getInstance()
+        if (alarmTime > 0L) {
+            calendar.timeInMillis = alarmTime
+        }
+
+        val currentHour24 = calendar.get(Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(Calendar.MINUTE)
+
+        val currentHour12 = when {
+            currentHour24 == 0 -> 12
+            currentHour24 > 12 -> currentHour24 - 12
+            else -> currentHour24
+        }
+        val currentAmPm = if (currentHour24 >= 12) 1 else 0
+
+        hourPicker.value = currentHour12
+        minutePicker.value = currentMinute
+        ampmPicker.value = currentAmPm
+
+        val hapticListener = NumberPicker.OnValueChangeListener { picker, _, _ ->
+            picker.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+
+        hourPicker.setOnValueChangedListener(hapticListener)
+        minutePicker.setOnValueChangedListener(hapticListener)
+        ampmPicker.setOnValueChangedListener(hapticListener)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogView)
+            .setPositiveButton("Accept") { _, _ ->
+                val selectedHour12 = hourPicker.value
+                val selectedMinute = minutePicker.value
+                val selectedAmPm = ampmPicker.value
+
+                val selectedHour24 = when {
+                    selectedAmPm == 0 && selectedHour12 == 12 -> 0
+                    selectedAmPm == 1 && selectedHour12 != 12 -> selectedHour12 + 12
+                    else -> selectedHour12
+                }
+
                 val cal = Calendar.getInstance()
-                cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                cal.set(Calendar.MINUTE, minute)
+                cal.set(Calendar.HOUR_OF_DAY, selectedHour24)
+                cal.set(Calendar.MINUTE, selectedMinute)
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
 
@@ -133,13 +194,10 @@ class HomeFragment(
 
                 alarmTime = cal.timeInMillis
                 updateAlarmInfo()
-            },
-            now.get(Calendar.HOUR_OF_DAY),
-            now.get(Calendar.MINUTE),
-            true
-        ).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
-
     private fun showWindowPicker() {
         val options = arrayOf("10 min", "20 min", "30 min", "45 min", "60 min")
         val values = arrayOf(10, 20, 30, 45, 60)
