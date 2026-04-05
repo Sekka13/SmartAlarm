@@ -2,37 +2,29 @@ package com.example.smartalarm.ui.fragments
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Handler
 import android.view.HapticFeedbackConstants
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.example.smartalarm.R
-import com.example.smartalarm.data.db.AppDatabase
-import com.example.smartalarm.data.model.SleepSession
-import com.example.smartalarm.data.repository.SleepSessionRepository
-import com.example.smartalarm.domain.heartrate.HeartRateSource
-import com.example.smartalarm.domain.heartrate.SimulationHeartRateSource
-// import com.example.smartalarm.domain.heartrate.BleHeartRateSource
-import com.example.smartalarm.domain.session.SleepSessionManager
-import com.example.smartalarm.ui.view.SleepChartView
+import com.example.smartalarm.domain.session.SessionState
+import com.example.smartalarm.platform.service.SessionForegroundService
+import com.example.smartalarm.ui.charts.SleepChartMode
+import com.example.smartalarm.ui.charts.SleepChartView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.shawnlin.numberpicker.NumberPicker
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.example.smartalarm.platform.alarm.AlarmScheduler
 
 class HomeFragment : Fragment() {
-
-    private lateinit var repository: SleepSessionRepository
-
-    // Cambia esta línea cuando quieras usar BLE real
-    private lateinit var source: HeartRateSource
-    // private lateinit var source: HeartRateSource = BleHeartRateSource()
 
     private lateinit var textBpm: TextView
     private lateinit var textPhase: TextView
@@ -48,23 +40,21 @@ class HomeFragment : Fragment() {
 
     private lateinit var sleepChart: SleepChartView
 
-    private lateinit var sessionManager: SleepSessionManager
-
     private var alarmTime: Long = 0L
     private var alarmWindow: Long = 30 * 60_000L
 
-    private var running = false
-
-    // Último timestamp recibido de la fuente (simulado o real)
-    private var currentSampleTime: Long = 0L
-
-    // Momento en que se disparó la alarma
-    private var alarmTriggeredAt: Long? = null
-
-    // Primer timestamp mostrado para calcular duración visible
-    private var sessionStartDisplayTime: Long = 0L
-
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    private val uiHandler = Handler(Looper.getMainLooper())
+
+    private val stateUpdater = object : Runnable {
+        override fun run() {
+            if (isAdded) {
+                renderState(SessionForegroundService.latestState)
+                uiHandler.postDelayed(this, 1000L)
+            }
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -72,10 +62,7 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         val view = inflater.inflate(R.layout.fragment_home, container, false)
-        val db = AppDatabase.getDatabase(requireContext())
-        repository = SleepSessionRepository(db.sleepSessionDao())
 
-        source = SimulationHeartRateSource(requireContext())
         textBpm = view.findViewById(R.id.text_bpm)
         textPhase = view.findViewById(R.id.text_phase)
         textAlarm = view.findViewById(R.id.text_alarm)
@@ -87,18 +74,26 @@ class HomeFragment : Fragment() {
         buttonStart = view.findViewById(R.id.button_start)
         buttonSetAlarm = view.findViewById(R.id.button_set_alarm)
         buttonSetWindow = view.findViewById(R.id.button_set_window)
-        sleepChart = view.findViewById(R.id.sleep_chart)
 
-        sessionManager = SleepSessionManager(
-            repository = repository,
-            scope = lifecycleScope
-        )
+        sleepChart = view.findViewById(R.id.sleep_chart)
+        sleepChart.setChartMode(SleepChartMode.LIVE)
+        sleepChart.setShowPhaseOverlay(true)
 
         setupButtons()
         updateAlarmInfo()
-        resetSessionTexts()
+        renderState(SessionForegroundService.latestState)
 
         return view
+    }
+
+    override fun onResume() {
+        super.onResume()
+        uiHandler.post(stateUpdater)
+    }
+
+    override fun onPause() {
+        uiHandler.removeCallbacks(stateUpdater)
+        super.onPause()
     }
 
     private fun setupButtons() {
@@ -111,10 +106,17 @@ class HomeFragment : Fragment() {
         }
 
         buttonStart.setOnClickListener {
-            if (!running) {
-                startSession(source)
+            if (!SessionForegroundService.latestState.isRunning) {
+               AlarmScheduler(requireContext()).scheduleExactAlarm(alarmTime)
+
+                SessionForegroundService.startSession(
+                    context = requireContext(),
+                    alarmTime = alarmTime,
+                    alarmWindow = alarmWindow
+                )
             } else {
-                stopSession()
+                AlarmScheduler(requireContext()).cancelExactAlarm()
+                SessionForegroundService.stopSession(requireContext())
             }
         }
     }
@@ -187,7 +189,6 @@ class HomeFragment : Fragment() {
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
 
-                // Si la hora ya pasó hoy, se mueve a mañana
                 if (cal.timeInMillis <= System.currentTimeMillis()) {
                     cal.add(Calendar.DAY_OF_YEAR, 1)
                 }
@@ -198,6 +199,7 @@ class HomeFragment : Fragment() {
             .setNegativeButton("Cancel", null)
             .show()
     }
+
     private fun showWindowPicker() {
         val options = arrayOf("10 min", "20 min", "30 min", "45 min", "60 min")
         val values = arrayOf(10, 20, 30, 45, 60)
@@ -226,104 +228,42 @@ class HomeFragment : Fragment() {
             }"
     }
 
-    private fun resetSessionTexts() {
-        textCurrentTime.text = "Current time: --"
-        textAlarmTriggeredAt.text = "Alarm triggered at: --"
-        textDuration.text = "Duration: --"
-        textBpm.text = "BPM: --"
-        textPhase.text = "Phase: --"
-        textAlarm.text = "Alarm: OFF"
-    }
+    private fun renderState(state: SessionState) {
+        buttonStart.text = if (state.isRunning) "Stop" else "Start"
 
-    private fun startSession(source: HeartRateSource) {
-        sleepChart.clearData()
-        running = true
-        currentSampleTime = 0L
-        alarmTriggeredAt = null
-        sessionStartDisplayTime = 0L
-
-        buttonStart.text = "Stop"
-        resetSessionTexts()
-
-        sessionManager.startSession(
-            source = source,
-            alarmTime = alarmTime,
-            alarmWindow = alarmWindow,
-            onUpdate = { phase, bpm, alarmTriggered, timestamp ->
-                activity?.runOnUiThread {
-                    currentSampleTime = timestamp
-
-                    if (sessionStartDisplayTime == 0L) {
-                        sessionStartDisplayTime = timestamp
-                    }
-
-                    val durationMinutes =
-                        ((timestamp - sessionStartDisplayTime) / 60_000L).toInt()
-
-                    textCurrentTime.text =
-                        "Current time: ${timeFormat.format(Date(timestamp))}"
-
-                    textDuration.text = "Duration: $durationMinutes min"
-                    textBpm.text = "BPM: $bpm"
-                    textPhase.text = "Phase: ${phase.name}"
-                    textAlarm.text = if (alarmTriggered) "Alarm: ON" else "Alarm: OFF"
-
-                    val simulatedPhase: String? = null
-
-                    sleepChart.addPoint(
-                        timeMillis = timestamp,
-                        bpm = bpm,
-                        phase = phase,
-                        simulatedPhase = simulatedPhase
-                    )
-
-                    if (alarmTriggered && alarmTriggeredAt == null) {
-                        alarmTriggeredAt = timestamp
-                        textAlarmTriggeredAt.text =
-                            "Alarm triggered at: ${timeFormat.format(Date(timestamp))}"
-                    }
-                }
-            },
-            onFinished = { session ->
-                activity?.runOnUiThread {
-                    handleFinishedSession(session)
-                }
-            }
-        )
-    }
-
-    private fun stopSession() {
-        running = false
-        buttonStart.text = "Start"
-        sessionManager.stopSession()
-        textAlarm.text = "Alarm: OFF"
-    }
-
-    private fun handleFinishedSession(session: SleepSession) {
-        running = false
-        buttonStart.text = "Start"
-
-        val durationMinutes = ((session.endTime - session.startTime) / 60_000L).toInt()
-
-        textDuration.text = "Duration: $durationMinutes min"
-        textCurrentTime.text =
-            "Current time: ${timeFormat.format(Date(session.endTime))}"
-
-        if (alarmTriggeredAt != null) {
-            textAlarm.text = "Alarm: ON"
-            textAlarmTriggeredAt.text =
-                "Alarm triggered at: ${timeFormat.format(Date(alarmTriggeredAt!!))}"
-        } else {
+        if (state.currentTimestamp == 0L) {
+            textCurrentTime.text = "Current time: --"
+            textDuration.text = "Duration: --"
+            textBpm.text = "BPM: --"
+            textPhase.text = "Phase: --"
             textAlarm.text = "Alarm: OFF"
-            textAlarmTriggeredAt.text = "Alarm triggered at: Natural wake-up"
+            if (state.alarmTriggeredAt == null) {
+                textAlarmTriggeredAt.text = "Alarm triggered at: --"
+            }
+            sleepChart.clearData()
+            return
         }
 
-        textPhase.text =
-            "Session finished | Avg: ${session.bpmAvg} | Min: ${session.bpmMin} | Max: ${session.bpmMax}"
-    }
+        textCurrentTime.text = "Current time: ${timeFormat.format(Date(state.currentTimestamp))}"
+        textBpm.text = "BPM: ${state.currentBpm ?: "--"}"
+        textPhase.text = "Phase: ${state.currentPhase ?: "--"}"
+        textAlarm.text = if (state.alarmTriggered) "Alarm: ON" else "Alarm: OFF"
 
-    override fun onDestroyView() {
-        sessionManager.stopSession()
-        super.onDestroyView()
+        if (state.sessionStartDisplayTime > 0L) {
+            val durationMinutes =
+                ((state.currentTimestamp - state.sessionStartDisplayTime) / 60_000L).toInt()
+            textDuration.text = "Duration: $durationMinutes min"
+        } else {
+            textDuration.text = "Duration: --"
+        }
+
+        if (state.alarmTriggeredAt != null) {
+            textAlarmTriggeredAt.text =
+                "Alarm triggered at: ${timeFormat.format(Date(state.alarmTriggeredAt))}"
+        } else {
+            textAlarmTriggeredAt.text = "Alarm triggered at: --"
+        }
+
+        sleepChart.setSessionData(state.chartPoints)
     }
 }
