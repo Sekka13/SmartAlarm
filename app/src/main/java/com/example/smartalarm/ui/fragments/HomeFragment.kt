@@ -1,18 +1,28 @@
 package com.example.smartalarm.ui.fragments
 
+import android.Manifest
 import android.app.AlertDialog
+import android.app.NotificationManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.view.HapticFeedbackConstants
 import android.os.Looper
+import android.provider.Settings
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.example.smartalarm.R
 import com.example.smartalarm.domain.session.SessionState
+import com.example.smartalarm.platform.alarm.AlarmScheduler
 import com.example.smartalarm.platform.service.SessionForegroundService
 import com.example.smartalarm.ui.charts.SleepChartMode
 import com.example.smartalarm.ui.charts.SleepChartView
@@ -22,7 +32,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.example.smartalarm.platform.alarm.AlarmScheduler
 
 class HomeFragment : Fragment() {
 
@@ -44,8 +53,14 @@ class HomeFragment : Fragment() {
     private var alarmWindow: Long = 30 * 60_000L
 
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-
     private val uiHandler = Handler(Looper.getMainLooper())
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                textAlarmInfo.text = "Enable notifications so the alarm can appear in background"
+            }
+        }
 
     private val stateUpdater = object : Runnable {
         override fun run() {
@@ -107,17 +122,77 @@ class HomeFragment : Fragment() {
 
         buttonStart.setOnClickListener {
             if (!SessionForegroundService.latestState.isRunning) {
-               AlarmScheduler(requireContext()).scheduleExactAlarm(alarmTime)
-
-                SessionForegroundService.startSession(
-                    context = requireContext(),
-                    alarmTime = alarmTime,
-                    alarmWindow = alarmWindow
-                )
+                startSessionWithChecks()
             } else {
                 AlarmScheduler(requireContext()).cancelExactAlarm()
                 SessionForegroundService.stopSession(requireContext())
             }
+        }
+    }
+
+    private fun startSessionWithChecks() {
+        if (alarmTime == 0L) {
+            textAlarmInfo.text = "Configure an alarm before starting the session"
+            return
+        }
+
+        if (!hasNotificationPermission()) {
+            textAlarmInfo.text = "Allow notifications so the alarm can work in background"
+            requestNotificationPermission()
+            return
+        }
+
+        if (!canUseFullScreenIntent()) {
+            textAlarmInfo.text = "Allow full-screen alarms for SmartAlarm"
+            requestFullScreenIntentPermission()
+            return
+        }
+
+        val scheduled = AlarmScheduler(requireContext()).scheduleExactAlarm(alarmTime)
+        if (!scheduled) {
+            textAlarmInfo.text = "The exact alarm could not be scheduled"
+            return
+        }
+
+        SessionForegroundService.startSession(
+            context = requireContext(),
+            alarmTime = alarmTime,
+            alarmWindow = alarmWindow
+        )
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun canUseFullScreenIntent(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val manager = requireContext().getSystemService(NotificationManager::class.java)
+            manager.canUseFullScreenIntent()
+        } else {
+            true
+        }
+    }
+
+    private fun requestFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                data = Uri.parse("package:${requireContext().packageName}")
+            }
+            startActivity(intent)
         }
     }
 
@@ -221,7 +296,6 @@ class HomeFragment : Fragment() {
         }
 
         val windowStart = alarmTime - alarmWindow
-
         textAlarmInfo.text =
             "Alarm: ${timeFormat.format(Date(alarmTime))} | Window starts: ${
                 timeFormat.format(Date(windowStart))
