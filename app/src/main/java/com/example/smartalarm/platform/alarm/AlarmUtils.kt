@@ -18,11 +18,19 @@ object AlarmUtils {
     private const val FULL_SCREEN_REQUEST_CODE = 3002
     private const val STOP_REQUEST_CODE = 3003
 
-    fun showAlarmNotification(context: Context) {
+    fun showAlarmNotification(
+        context: Context,
+        soundName: String = "Default",
+        volumePercent: Int = 100,
+        vibrationMode: String = "Normal"
+    ) {
         createAlarmChannel(context)
 
         val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("extra_sound_name", soundName)
+            putExtra("extra_volume_percent", volumePercent)
+            putExtra("extra_vibration_mode", vibrationMode)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -55,7 +63,12 @@ object AlarmUtils {
             .addAction(0, "Stop", stopPendingIntent)
             .build()
 
-        AlarmRing.start(context)
+        AlarmRing.start(
+            context = context,
+            soundName = soundName,
+            volumePercent = volumePercent,
+            vibrationMode = vibrationMode
+        )
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, notification)

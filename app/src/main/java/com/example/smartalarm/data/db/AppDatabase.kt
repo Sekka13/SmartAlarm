@@ -6,18 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.smartalarm.data.model.AlarmConfig
 import com.example.smartalarm.data.model.HeartRateSample
 import com.example.smartalarm.data.model.SleepSession
 
 @Database(
-    entities = [SleepSession::class, HeartRateSample::class],
-    version = 2,
+    entities = [SleepSession::class, HeartRateSample::class, AlarmConfig::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun sleepSessionDao(): SleepSessionDao
     abstract fun heartRateDao(): HeartRateDao
+    abstract fun alarmConfigDao(): AlarmConfigDao
 
     companion object {
         @Volatile
@@ -81,6 +83,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS alarm_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        hour24 INTEGER NOT NULL,
+                        minute INTEGER NOT NULL,
+                        smartWindowMinutes INTEGER NOT NULL,
+                        repeatDays TEXT NOT NULL,
+                        soundName TEXT NOT NULL,
+                        volumePercent INTEGER NOT NULL,
+                        vibrationMode TEXT NOT NULL,
+                        snoozeEnabled INTEGER NOT NULL,
+                        snoozeMinutes INTEGER NOT NULL,
+                        snoozeMaxRepeats INTEGER NOT NULL,
+                        isEnabled INTEGER NOT NULL,
+                        isSelected INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -88,7 +115,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_alarm_db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

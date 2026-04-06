@@ -1,7 +1,6 @@
 package com.example.smartalarm.ui.fragments
 
 import android.Manifest
-import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,7 +10,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -20,20 +18,33 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.smartalarm.R
+import com.example.smartalarm.data.db.AppDatabase
+import com.example.smartalarm.data.model.AlarmConfig
+import com.example.smartalarm.data.repository.AlarmConfigRepository
+import com.example.smartalarm.domain.alarm.AlarmScheduleManager
 import com.example.smartalarm.domain.session.SessionState
 import com.example.smartalarm.platform.alarm.AlarmScheduler
 import com.example.smartalarm.platform.service.SessionForegroundService
+import com.example.smartalarm.ui.adapters.AlarmConfigAdapter
 import com.example.smartalarm.ui.charts.SleepChartMode
 import com.example.smartalarm.ui.charts.SleepChartView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.shawnlin.numberpicker.NumberPicker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
-class HomeFragment : Fragment() {
+class AlarmDashboardFragment : Fragment() {
+
+    private lateinit var alarmRepository: AlarmConfigRepository
+    private lateinit var alarmAdapter: AlarmConfigAdapter
+    private val alarmScheduleManager = AlarmScheduleManager()
 
     private lateinit var textBpm: TextView
     private lateinit var textPhase: TextView
@@ -47,10 +58,12 @@ class HomeFragment : Fragment() {
     private lateinit var buttonSetAlarm: Button
     private lateinit var buttonSetWindow: Button
 
+    private lateinit var recyclerAlarms: RecyclerView
     private lateinit var sleepChart: SleepChartView
 
+    private var nextActiveAlarm: AlarmConfig? = null
     private var alarmTime: Long = 0L
-    private var alarmWindow: Long = 30 * 60_000L
+    private var alarmWindow: Long = TimeUnit.MINUTES.toMillis(30)
 
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -78,6 +91,9 @@ class HomeFragment : Fragment() {
     ): View {
         val view = inflater.inflate(R.layout.fragment_home, container, false)
 
+        val db = AppDatabase.getDatabase(requireContext())
+        alarmRepository = AlarmConfigRepository(db.alarmConfigDao())
+
         textBpm = view.findViewById(R.id.text_bpm)
         textPhase = view.findViewById(R.id.text_phase)
         textAlarm = view.findViewById(R.id.text_alarm)
@@ -90,12 +106,14 @@ class HomeFragment : Fragment() {
         buttonSetAlarm = view.findViewById(R.id.button_set_alarm)
         buttonSetWindow = view.findViewById(R.id.button_set_window)
 
+        recyclerAlarms = view.findViewById(R.id.recycler_alarms)
+
         sleepChart = view.findViewById(R.id.sleep_chart)
         sleepChart.setChartMode(SleepChartMode.LIVE)
         sleepChart.setShowPhaseOverlay(true)
 
+        setupRecycler()
         setupButtons()
-        updateAlarmInfo()
         renderState(SessionForegroundService.latestState)
 
         return view
@@ -104,6 +122,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         uiHandler.post(stateUpdater)
+        loadAlarms()
     }
 
     override fun onPause() {
@@ -111,14 +130,31 @@ class HomeFragment : Fragment() {
         super.onPause()
     }
 
+    private fun setupRecycler() {
+        alarmAdapter = AlarmConfigAdapter(
+            items = emptyList(),
+            onAlarmClicked = { alarm ->
+                (parentFragment as? AlarmContainerFragment)?.showSetup(alarm.id)
+            },
+            onAlarmEnabledChanged = { alarm, enabled ->
+                updateAlarmEnabled(alarm, enabled)
+            },
+            onAlarmDeleteClicked = { alarm ->
+                deleteAlarm(alarm)
+            }
+        )
+
+        recyclerAlarms.layoutManager = LinearLayoutManager(requireContext())
+        recyclerAlarms.adapter = alarmAdapter
+    }
+
     private fun setupButtons() {
+        buttonSetAlarm.text = "Add new alarm"
         buttonSetAlarm.setOnClickListener {
-            showAlarmPicker()
+            (parentFragment as? AlarmContainerFragment)?.showSetup()
         }
 
-        buttonSetWindow.setOnClickListener {
-            showWindowPicker()
-        }
+        buttonSetWindow.visibility = View.GONE
 
         buttonStart.setOnClickListener {
             if (!SessionForegroundService.latestState.isRunning) {
@@ -130,9 +166,55 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun loadAlarms() {
+        lifecycleScope.launch {
+            val alarms = withContext(Dispatchers.IO) {
+                alarmRepository.getAll()
+            }
+
+            alarmAdapter.submitList(alarms)
+            applyNextAlarmState(alarms)
+        }
+    }
+
+    private fun applyNextAlarmState(alarms: List<AlarmConfig>) {
+        val nextResult = alarmScheduleManager.resolveNextActiveAlarm(alarms)
+
+        if (nextResult == null) {
+            nextActiveAlarm = null
+            alarmTime = 0L
+            alarmWindow = TimeUnit.MINUTES.toMillis(30)
+            textAlarmInfo.text = "No active alarms"
+            return
+        }
+
+        nextActiveAlarm = nextResult.alarm
+        alarmTime = nextResult.triggerAtMillis
+        alarmWindow = TimeUnit.MINUTES.toMillis(nextResult.alarm.smartWindowMinutes.toLong())
+        textAlarmInfo.text = alarmScheduleManager.buildAlarmSummary(nextResult.alarm)
+    }
+
+    private fun updateAlarmEnabled(alarm: AlarmConfig, enabled: Boolean) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                alarmRepository.update(alarm.copy(isEnabled = enabled))
+            }
+            loadAlarms()
+        }
+    }
+
+    private fun deleteAlarm(alarm: AlarmConfig) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                alarmRepository.delete(alarm)
+            }
+            loadAlarms()
+        }
+    }
+
     private fun startSessionWithChecks() {
-        if (alarmTime == 0L) {
-            textAlarmInfo.text = "Configure an alarm before starting the session"
+        if (nextActiveAlarm == null || alarmTime == 0L) {
+            textAlarmInfo.text = "Create and activate at least one alarm before starting"
             return
         }
 
@@ -148,16 +230,28 @@ class HomeFragment : Fragment() {
             return
         }
 
-        val scheduled = AlarmScheduler(requireContext()).scheduleExactAlarm(alarmTime)
+        val alarm = nextActiveAlarm ?: return
+
+        val scheduled = AlarmScheduler(requireContext()).scheduleExactAlarm(
+            triggerAtMillis = alarmTime,
+            soundName = alarm.soundName,
+            volumePercent = alarm.volumePercent,
+            vibrationMode = alarm.vibrationMode
+        )
         if (!scheduled) {
             textAlarmInfo.text = "The exact alarm could not be scheduled"
             return
         }
 
+
+
         SessionForegroundService.startSession(
             context = requireContext(),
             alarmTime = alarmTime,
-            alarmWindow = alarmWindow
+            alarmWindow = alarmWindow,
+            soundName = alarm.soundName,
+            volumePercent = alarm.volumePercent,
+            vibrationMode = alarm.vibrationMode
         )
     }
 
@@ -194,112 +288,6 @@ class HomeFragment : Fragment() {
             }
             startActivity(intent)
         }
-    }
-
-    private fun showAlarmPicker() {
-        val dialogView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_time_picker, null)
-
-        val hourPicker = dialogView.findViewById<NumberPicker>(R.id.hourPicker)
-        val minutePicker = dialogView.findViewById<NumberPicker>(R.id.minutePicker)
-        val ampmPicker = dialogView.findViewById<NumberPicker>(R.id.ampmPicker)
-
-        minutePicker.setFormatter { value ->
-            String.format(Locale.getDefault(), "%02d", value)
-        }
-
-        val ampmValues = arrayOf("AM", "PM")
-
-        ampmPicker.minValue = 0
-        ampmPicker.maxValue = ampmValues.size - 1
-        ampmPicker.displayedValues = ampmValues
-        ampmPicker.wrapSelectorWheel = false
-
-        hourPicker.wrapSelectorWheel = true
-        minutePicker.wrapSelectorWheel = true
-
-        val calendar = Calendar.getInstance()
-        if (alarmTime > 0L) {
-            calendar.timeInMillis = alarmTime
-        }
-
-        val currentHour24 = calendar.get(Calendar.HOUR_OF_DAY)
-        val currentMinute = calendar.get(Calendar.MINUTE)
-
-        val currentHour12 = when {
-            currentHour24 == 0 -> 12
-            currentHour24 > 12 -> currentHour24 - 12
-            else -> currentHour24
-        }
-        val currentAmPm = if (currentHour24 >= 12) 1 else 0
-
-        hourPicker.value = currentHour12
-        minutePicker.value = currentMinute
-        ampmPicker.value = currentAmPm
-
-        val hapticListener = NumberPicker.OnValueChangeListener { picker, _, _ ->
-            picker.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-        }
-
-        hourPicker.setOnValueChangedListener(hapticListener)
-        minutePicker.setOnValueChangedListener(hapticListener)
-        ampmPicker.setOnValueChangedListener(hapticListener)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setView(dialogView)
-            .setPositiveButton("Accept") { _, _ ->
-                val selectedHour12 = hourPicker.value
-                val selectedMinute = minutePicker.value
-                val selectedAmPm = ampmPicker.value
-
-                val selectedHour24 = when {
-                    selectedAmPm == 0 && selectedHour12 == 12 -> 0
-                    selectedAmPm == 1 && selectedHour12 != 12 -> selectedHour12 + 12
-                    else -> selectedHour12
-                }
-
-                val cal = Calendar.getInstance()
-                cal.set(Calendar.HOUR_OF_DAY, selectedHour24)
-                cal.set(Calendar.MINUTE, selectedMinute)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-
-                if (cal.timeInMillis <= System.currentTimeMillis()) {
-                    cal.add(Calendar.DAY_OF_YEAR, 1)
-                }
-
-                alarmTime = cal.timeInMillis
-                updateAlarmInfo()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showWindowPicker() {
-        val options = arrayOf("10 min", "20 min", "30 min", "45 min", "60 min")
-        val values = arrayOf(10, 20, 30, 45, 60)
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Select smart window")
-            .setItems(options) { _, which ->
-                alarmWindow = values[which] * 60_000L
-                updateAlarmInfo()
-            }
-            .show()
-    }
-
-    private fun updateAlarmInfo() {
-        if (alarmTime == 0L) {
-            textAlarmInfo.text =
-                "Alarm not configured | Window: ${alarmWindow / 60_000L} min"
-            return
-        }
-
-        val windowStart = alarmTime - alarmWindow
-        textAlarmInfo.text =
-            "Alarm: ${timeFormat.format(Date(alarmTime))} | Window starts: ${
-                timeFormat.format(Date(windowStart))
-            }"
     }
 
     private fun renderState(state: SessionState) {

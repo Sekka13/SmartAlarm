@@ -146,6 +146,22 @@
                 android:backgroundTint="@color/primary_lavender"
                 android:textColor="@color/background_dark"
                 app:cornerRadius="28dp" />
+            <TextView
+                android:id="@+id/text_saved_alarms_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Saved alarms"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_alarms"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:nestedScrollingEnabled="false" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_set_window"

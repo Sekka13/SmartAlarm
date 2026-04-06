@@ -31,7 +31,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 
-
 class SessionForegroundService : Service(), SessionEventListener {
 
     companion object {
@@ -43,16 +42,29 @@ class SessionForegroundService : Service(), SessionEventListener {
 
         const val EXTRA_ALARM_TIME = "extra_alarm_time"
         const val EXTRA_ALARM_WINDOW = "extra_alarm_window"
+        const val EXTRA_SOUND_NAME = "extra_sound_name"
+        const val EXTRA_VOLUME_PERCENT = "extra_volume_percent"
+        const val EXTRA_VIBRATION_MODE = "extra_vibration_mode"
 
         @Volatile
         var latestState: SessionState = SessionState()
             private set
 
-        fun startSession(context: Context, alarmTime: Long, alarmWindow: Long) {
+        fun startSession(
+            context: Context,
+            alarmTime: Long,
+            alarmWindow: Long,
+            soundName: String,
+            volumePercent: Int,
+            vibrationMode: String
+        ) {
             val intent = Intent(context, SessionForegroundService::class.java).apply {
                 action = ACTION_START_SESSION
                 putExtra(EXTRA_ALARM_TIME, alarmTime)
                 putExtra(EXTRA_ALARM_WINDOW, alarmWindow)
+                putExtra(EXTRA_SOUND_NAME, soundName)
+                putExtra(EXTRA_VOLUME_PERCENT, volumePercent)
+                putExtra(EXTRA_VIBRATION_MODE, vibrationMode)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -75,6 +87,9 @@ class SessionForegroundService : Service(), SessionEventListener {
     private lateinit var serviceScope: CoroutineScope
 
     private var alarmAlreadyLaunched = false
+    private var currentSoundName: String = "Default"
+    private var currentVolumePercent: Int = 100
+    private var currentVibrationMode: String = "Normal"
 
     override fun onCreate() {
         super.onCreate()
@@ -95,6 +110,10 @@ class SessionForegroundService : Service(), SessionEventListener {
 
         val alarmTime = intent.getLongExtra(EXTRA_ALARM_TIME, 0L)
         val alarmWindow = intent.getLongExtra(EXTRA_ALARM_WINDOW, 30 * 60_000L)
+
+        currentSoundName = intent.getStringExtra(EXTRA_SOUND_NAME) ?: "Default"
+        currentVolumePercent = intent.getIntExtra(EXTRA_VOLUME_PERCENT, 100)
+        currentVibrationMode = intent.getStringExtra(EXTRA_VIBRATION_MODE) ?: "Normal"
 
         alarmAlreadyLaunched = false
         latestState = SessionState()
@@ -174,9 +193,19 @@ class SessionForegroundService : Service(), SessionEventListener {
         AlarmScheduler(applicationContext).cancelExactAlarm()
 
         if (isAppInForeground()) {
-            AlarmActivity.launch(applicationContext)
+            AlarmActivity.launch(
+                context = applicationContext,
+                soundName = currentSoundName,
+                volumePercent = currentVolumePercent,
+                vibrationMode = currentVibrationMode
+            )
         } else {
-            AlarmUtils.showAlarmNotification(applicationContext)
+            AlarmUtils.showAlarmNotification(
+                context = applicationContext,
+                soundName = currentSoundName,
+                volumePercent = currentVolumePercent,
+                vibrationMode = currentVibrationMode
+            )
         }
 
         if (::sessionController.isInitialized && sessionController.isRunning()) {
