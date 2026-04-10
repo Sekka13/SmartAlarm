@@ -39,6 +39,7 @@ class SleepSessionManager(
         source: HeartRateSource,
         alarmTime: Long,
         alarmWindow: Long,
+        replayMode: SessionReplayMode,
         onUpdate: (SleepPhaseDetector.Phase, Int, Boolean, Long) -> Unit,
         onFinished: (SleepSession) -> Unit
     ) {
@@ -58,7 +59,10 @@ class SleepSessionManager(
             if (alarmTime > 0) alarmTime else Long.MAX_VALUE
 
         source.start { bpm, timestamp ->
-            val phase = SleepPhaseDetector.detectPhase(bpm)
+            val phase = SleepPhaseDetector.detectPhase(
+                bpm = bpm,
+                timestamp = timestamp
+            )
             val phaseName = phase.name
 
             phaseAccumulator.addSample(timestamp, phaseName)
@@ -123,7 +127,8 @@ class SleepSessionManager(
                     remMinutes = finalRemMinutes,
                     wakeMinutes = finalWakeMinutes,
                     alarmTriggeredAt = finalAlarmTriggeredAt,
-                    triggerReason = finalTriggerReason
+                    triggerReason = finalTriggerReason,
+                    replayMode = replayMode.name
                 )
 
                 scope.launch(Dispatchers.IO) {

@@ -21,6 +21,7 @@ import com.example.smartalarm.domain.heartrate.HeartRateSource
 import com.example.smartalarm.domain.heartrate.SimulationHeartRateSource
 import com.example.smartalarm.domain.session.SessionController
 import com.example.smartalarm.domain.session.SessionEventListener
+import com.example.smartalarm.domain.session.SessionReplayMode
 import com.example.smartalarm.domain.session.SessionState
 import com.example.smartalarm.domain.session.SleepSessionManager
 import com.example.smartalarm.platform.alarm.AlarmActivity
@@ -45,6 +46,7 @@ class SessionForegroundService : Service(), SessionEventListener {
         const val EXTRA_SOUND_NAME = "extra_sound_name"
         const val EXTRA_VOLUME_PERCENT = "extra_volume_percent"
         const val EXTRA_VIBRATION_MODE = "extra_vibration_mode"
+        const val EXTRA_REPLAY_MODE = "extra_replay_mode"
 
         @Volatile
         var latestState: SessionState = SessionState()
@@ -56,7 +58,8 @@ class SessionForegroundService : Service(), SessionEventListener {
             alarmWindow: Long,
             soundName: String,
             volumePercent: Int,
-            vibrationMode: String
+            vibrationMode: String,
+            replayMode: SessionReplayMode
         ) {
             val intent = Intent(context, SessionForegroundService::class.java).apply {
                 action = ACTION_START_SESSION
@@ -65,6 +68,7 @@ class SessionForegroundService : Service(), SessionEventListener {
                 putExtra(EXTRA_SOUND_NAME, soundName)
                 putExtra(EXTRA_VOLUME_PERCENT, volumePercent)
                 putExtra(EXTRA_VIBRATION_MODE, vibrationMode)
+                putExtra(EXTRA_REPLAY_MODE, replayMode.name)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -110,6 +114,7 @@ class SessionForegroundService : Service(), SessionEventListener {
 
         val alarmTime = intent.getLongExtra(EXTRA_ALARM_TIME, 0L)
         val alarmWindow = intent.getLongExtra(EXTRA_ALARM_WINDOW, 30 * 60_000L)
+        val replayMode = SessionReplayMode.fromName(intent.getStringExtra(EXTRA_REPLAY_MODE))
 
         currentSoundName = intent.getStringExtra(EXTRA_SOUND_NAME) ?: "Default"
         currentVolumePercent = intent.getIntExtra(EXTRA_VOLUME_PERCENT, 100)
@@ -117,12 +122,14 @@ class SessionForegroundService : Service(), SessionEventListener {
 
         alarmAlreadyLaunched = false
         latestState = SessionState()
+        heartRateSource = buildHeartRateSource(replayMode)
 
         if (!sessionController.isRunning()) {
             sessionController.startSession(
                 source = heartRateSource,
                 alarmTime = alarmTime,
-                alarmWindow = alarmWindow
+                alarmWindow = alarmWindow,
+                replayMode = replayMode
             )
         }
     }
@@ -160,8 +167,13 @@ class SessionForegroundService : Service(), SessionEventListener {
 
         sessionController = SessionController(sessionManager)
         sessionController.setListener(this)
+    }
 
-        heartRateSource = SimulationHeartRateSource(applicationContext)
+    private fun buildHeartRateSource(replayMode: SessionReplayMode): HeartRateSource {
+        return SimulationHeartRateSource(
+            context = applicationContext,
+            replayMode = replayMode
+        )
     }
 
     override fun onSessionStateChanged(state: SessionState) {

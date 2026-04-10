@@ -33,6 +33,16 @@
             android:textColor="@color/text_secondary"
             android:textSize="15sp" />
 
+        <TextView
+            android:id="@+id/text_replay_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Replay mode"
+            android:textColor="@color/accent_gold"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

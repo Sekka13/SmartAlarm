@@ -13,7 +13,10 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -26,6 +29,7 @@ import com.example.smartalarm.data.db.AppDatabase
 import com.example.smartalarm.data.model.AlarmConfig
 import com.example.smartalarm.data.repository.AlarmConfigRepository
 import com.example.smartalarm.domain.alarm.AlarmScheduleManager
+import com.example.smartalarm.domain.session.SessionReplayMode
 import com.example.smartalarm.domain.session.SessionState
 import com.example.smartalarm.platform.alarm.AlarmScheduler
 import com.example.smartalarm.platform.service.SessionForegroundService
@@ -48,8 +52,12 @@ class AlarmDashboardFragment : Fragment() {
 
     private lateinit var textBpm: TextView
     private lateinit var textPhase: TextView
-    private lateinit var textAlarm: TextView
     private lateinit var textAlarmInfo: TextView
+    private lateinit var textSimulationStartTime: TextView
+    private lateinit var textAlarmScheduledTime: TextView
+    private lateinit var textAlarmWindowStart: TextView
+    private lateinit var textAlarmWindowEnd: TextView
+    private lateinit var textReplayModeActive: TextView
     private lateinit var textCurrentTime: TextView
     private lateinit var textAlarmTriggeredAt: TextView
     private lateinit var textDuration: TextView
@@ -57,6 +65,7 @@ class AlarmDashboardFragment : Fragment() {
     private lateinit var buttonStart: Button
     private lateinit var buttonSetAlarm: Button
     private lateinit var buttonSetWindow: Button
+    private lateinit var spinnerSessionMode: Spinner
 
     private lateinit var recyclerAlarms: RecyclerView
     private lateinit var sleepChart: SleepChartView
@@ -64,9 +73,11 @@ class AlarmDashboardFragment : Fragment() {
     private var nextActiveAlarm: AlarmConfig? = null
     private var alarmTime: Long = 0L
     private var alarmWindow: Long = TimeUnit.MINUTES.toMillis(30)
+    private var selectedReplayMode: SessionReplayMode = SessionReplayMode.CSV_REALTIME
 
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private val uiHandler = Handler(Looper.getMainLooper())
+    private val replayModes = SessionReplayMode.selectableValues()
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -96,8 +107,12 @@ class AlarmDashboardFragment : Fragment() {
 
         textBpm = view.findViewById(R.id.text_bpm)
         textPhase = view.findViewById(R.id.text_phase)
-        textAlarm = view.findViewById(R.id.text_alarm)
         textAlarmInfo = view.findViewById(R.id.text_alarm_info)
+        textSimulationStartTime = view.findViewById(R.id.text_simulation_start_time)
+        textAlarmScheduledTime = view.findViewById(R.id.text_alarm_scheduled_time)
+        textAlarmWindowStart = view.findViewById(R.id.text_alarm_window_start)
+        textAlarmWindowEnd = view.findViewById(R.id.text_alarm_window_end)
+        textReplayModeActive = view.findViewById(R.id.text_replay_mode_active)
         textCurrentTime = view.findViewById(R.id.text_current_time)
         textAlarmTriggeredAt = view.findViewById(R.id.text_alarm_triggered_at)
         textDuration = view.findViewById(R.id.text_duration)
@@ -105,6 +120,7 @@ class AlarmDashboardFragment : Fragment() {
         buttonStart = view.findViewById(R.id.button_start)
         buttonSetAlarm = view.findViewById(R.id.button_set_alarm)
         buttonSetWindow = view.findViewById(R.id.button_set_window)
+        spinnerSessionMode = view.findViewById(R.id.spinner_session_mode)
 
         recyclerAlarms = view.findViewById(R.id.recycler_alarms)
 
@@ -113,6 +129,7 @@ class AlarmDashboardFragment : Fragment() {
         sleepChart.setShowPhaseOverlay(true)
 
         setupRecycler()
+        setupReplayModeSelector()
         setupButtons()
         renderState(SessionForegroundService.latestState)
 
@@ -146,6 +163,33 @@ class AlarmDashboardFragment : Fragment() {
 
         recyclerAlarms.layoutManager = LinearLayoutManager(requireContext())
         recyclerAlarms.adapter = alarmAdapter
+    }
+
+    private fun setupReplayModeSelector() {
+        val labels = replayModes.map { it.displayName }
+        spinnerSessionMode.adapter = ArrayAdapter(
+            requireContext(),
+            R.layout.item_spinner_dark,
+            labels
+        ).also {
+            it.setDropDownViewResource(R.layout.item_spinner_dropdown_dark)
+        }
+        spinnerSessionMode.setSelection(replayModes.indexOf(selectedReplayMode))
+        spinnerSessionMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                selectedReplayMode = replayModes.getOrElse(position) {
+                    SessionReplayMode.CSV_REALTIME
+                }
+                renderReplayModeInfo(SessionForegroundService.latestState)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
     }
 
     private fun setupButtons() {
@@ -185,6 +229,7 @@ class AlarmDashboardFragment : Fragment() {
             alarmTime = 0L
             alarmWindow = TimeUnit.MINUTES.toMillis(30)
             textAlarmInfo.text = "No active alarms"
+            renderAlarmTimingInfo()
             return
         }
 
@@ -192,6 +237,7 @@ class AlarmDashboardFragment : Fragment() {
         alarmTime = nextResult.triggerAtMillis
         alarmWindow = TimeUnit.MINUTES.toMillis(nextResult.alarm.smartWindowMinutes.toLong())
         textAlarmInfo.text = alarmScheduleManager.buildAlarmSummary(nextResult.alarm)
+        renderAlarmTimingInfo()
     }
 
     private fun updateAlarmEnabled(alarm: AlarmConfig, enabled: Boolean) {
@@ -231,19 +277,24 @@ class AlarmDashboardFragment : Fragment() {
         }
 
         val alarm = nextActiveAlarm ?: return
-
-        val scheduled = AlarmScheduler(requireContext()).scheduleExactAlarm(
-            triggerAtMillis = alarmTime,
-            soundName = alarm.soundName,
-            volumePercent = alarm.volumePercent,
-            vibrationMode = alarm.vibrationMode
-        )
-        if (!scheduled) {
-            textAlarmInfo.text = "The exact alarm could not be scheduled"
-            return
+        selectedReplayMode = replayModes.getOrElse(spinnerSessionMode.selectedItemPosition) {
+            SessionReplayMode.CSV_REALTIME
         }
 
-
+        if (selectedReplayMode.schedulesExactAlarm) {
+            val scheduled = AlarmScheduler(requireContext()).scheduleExactAlarm(
+                triggerAtMillis = alarmTime,
+                soundName = alarm.soundName,
+                volumePercent = alarm.volumePercent,
+                vibrationMode = alarm.vibrationMode
+            )
+            if (!scheduled) {
+                textAlarmInfo.text = "The exact alarm could not be scheduled"
+                return
+            }
+        } else {
+            AlarmScheduler(requireContext()).cancelExactAlarm()
+        }
 
         SessionForegroundService.startSession(
             context = requireContext(),
@@ -251,7 +302,8 @@ class AlarmDashboardFragment : Fragment() {
             alarmWindow = alarmWindow,
             soundName = alarm.soundName,
             volumePercent = alarm.volumePercent,
-            vibrationMode = alarm.vibrationMode
+            vibrationMode = alarm.vibrationMode,
+            replayMode = selectedReplayMode
         )
     }
 
@@ -292,13 +344,22 @@ class AlarmDashboardFragment : Fragment() {
 
     private fun renderState(state: SessionState) {
         buttonStart.text = if (state.isRunning) "Stop" else "Start"
+        spinnerSessionMode.isEnabled = !state.isRunning
+
+        textSimulationStartTime.text = if (state.sessionStartDisplayTime > 0L) {
+            "Simulation start: ${timeFormat.format(Date(state.sessionStartDisplayTime))}"
+        } else {
+            "Simulation start: --"
+        }
+
+        renderAlarmTimingInfo()
+        renderReplayModeInfo(state)
 
         if (state.currentTimestamp == 0L) {
             textCurrentTime.text = "Current time: --"
             textDuration.text = "Duration: --"
             textBpm.text = "BPM: --"
             textPhase.text = "Phase: --"
-            textAlarm.text = "Alarm: OFF"
             if (state.alarmTriggeredAt == null) {
                 textAlarmTriggeredAt.text = "Alarm triggered at: --"
             }
@@ -309,7 +370,6 @@ class AlarmDashboardFragment : Fragment() {
         textCurrentTime.text = "Current time: ${timeFormat.format(Date(state.currentTimestamp))}"
         textBpm.text = "BPM: ${state.currentBpm ?: "--"}"
         textPhase.text = "Phase: ${state.currentPhase ?: "--"}"
-        textAlarm.text = if (state.alarmTriggered) "Alarm: ON" else "Alarm: OFF"
 
         if (state.sessionStartDisplayTime > 0L) {
             val durationMinutes =
@@ -327,5 +387,33 @@ class AlarmDashboardFragment : Fragment() {
         }
 
         sleepChart.setSessionData(state.chartPoints)
+    }
+
+    private fun renderReplayModeInfo(state: SessionState) {
+        val displayName = if (state.isRunning && state.replayModeName != null) {
+            SessionReplayMode.displayNameFromStoredValue(state.replayModeName)
+        } else {
+            selectedReplayMode.displayName
+        }
+
+        textReplayModeActive.text = "Replay mode: $displayName"
+    }
+
+    private fun renderAlarmTimingInfo() {
+        if (alarmTime <= 0L) {
+            textAlarmScheduledTime.text = "Scheduled alarm: --"
+            textAlarmWindowStart.text = "Min alarm time: --"
+            textAlarmWindowEnd.text = "Max alarm time: --"
+            return
+        }
+
+        val windowStartTime = (alarmTime - alarmWindow).coerceAtLeast(0L)
+
+        textAlarmScheduledTime.text =
+            "Scheduled alarm: ${timeFormat.format(Date(alarmTime))}"
+        textAlarmWindowStart.text =
+            "Min alarm time: ${timeFormat.format(Date(windowStartTime))}"
+        textAlarmWindowEnd.text =
+            "Max alarm time: ${timeFormat.format(Date(alarmTime))}"
     }
 }

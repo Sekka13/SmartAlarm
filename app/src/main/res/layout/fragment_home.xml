@@ -46,12 +46,48 @@
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/text_alarm"
+                    android:id="@+id/text_simulation_start_time"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Alarm: OFF"
+                    android:text="Simulation start: --"
                     android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/text_alarm_scheduled_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Scheduled alarm: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/text_alarm_window_start"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Min alarm time: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/text_alarm_window_end"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Max alarm time: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/text_replay_mode_active"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Replay mode: --"
+                    android:textColor="@color/accent_gold"
                     android:textSize="16sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -146,6 +182,25 @@
                 android:backgroundTint="@color/primary_lavender"
                 android:textColor="@color/background_dark"
                 app:cornerRadius="28dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Replay mode"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinner_session_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/surface_dark_2"
+                android:padding="12dp"
+                android:popupBackground="@color/surface_dark" />
+
             <TextView
                 android:id="@+id/text_saved_alarms_title"
                 android:layout_width="wrap_content"

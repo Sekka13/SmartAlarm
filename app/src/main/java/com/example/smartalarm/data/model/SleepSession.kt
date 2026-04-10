@@ -18,5 +18,6 @@ data class SleepSession(
     val wakeMinutes: Int = 0,
 
     val alarmTriggeredAt: Long? = null,
-    val triggerReason: String? = null
+    val triggerReason: String? = null,
+    val replayMode: String = "LEGACY_UNKNOWN"
 )

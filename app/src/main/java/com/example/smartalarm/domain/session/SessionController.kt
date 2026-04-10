@@ -24,7 +24,8 @@ class SessionController(
     fun startSession(
         source: HeartRateSource,
         alarmTime: Long,
-        alarmWindow: Long
+        alarmWindow: Long,
+        replayMode: SessionReplayMode
     ) {
         if (state.isRunning) return
 
@@ -33,6 +34,7 @@ class SessionController(
             currentBpm = null,
             currentPhase = null,
             currentTimestamp = 0L,
+            replayModeName = replayMode.name,
             alarmTriggered = false,
             alarmTriggeredAt = null,
             sessionStartDisplayTime = 0L,
@@ -44,6 +46,7 @@ class SessionController(
             source = source,
             alarmTime = alarmTime,
             alarmWindow = alarmWindow,
+            replayMode = replayMode,
             onUpdate = { phase, bpm, alarmTriggered, timestamp ->
                 handleUpdate(
                     phase = phase,
@@ -93,6 +96,7 @@ class SessionController(
             currentBpm = bpm,
             currentPhase = phase.name,
             currentTimestamp = timestamp,
+            replayModeName = state.replayModeName,
             alarmTriggered = alarmTriggered || state.alarmTriggered,
             alarmTriggeredAt = triggeredAt,
             sessionStartDisplayTime = startDisplayTime,

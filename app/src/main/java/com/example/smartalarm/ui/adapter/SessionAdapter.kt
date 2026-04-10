@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.smartalarm.R
 import com.example.smartalarm.data.model.SleepSession
+import com.example.smartalarm.domain.session.SessionReplayMode
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -18,6 +19,7 @@ class SessionAdapter(
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val textStart: TextView = view.findViewById(R.id.text_start_time)
         val textEnd: TextView = view.findViewById(R.id.text_end_time)
+        val textReplayMode: TextView = view.findViewById(R.id.text_replay_mode)
         val textMin: TextView = view.findViewById(R.id.text_bpm_min)
         val textMax: TextView = view.findViewById(R.id.text_bpm_max)
         val textAvg: TextView = view.findViewById(R.id.text_bpm_avg)
@@ -43,6 +45,9 @@ class SessionAdapter(
 
         holder.textEnd.text =
             "End ${timeFormat.format(endDate)}"
+
+        holder.textReplayMode.text =
+            "Replay mode: ${SessionReplayMode.displayNameFromStoredValue(session.replayMode)}"
 
         holder.textMin.text = "Min: ${session.bpmMin}"
         holder.textMax.text = "Max: ${session.bpmMax}"

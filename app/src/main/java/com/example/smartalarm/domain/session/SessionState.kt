@@ -7,6 +7,7 @@ data class SessionState(
     val currentBpm: Int? = null,
     val currentPhase: String? = null,
     val currentTimestamp: Long = 0L,
+    val replayModeName: String? = null,
     val alarmTriggered: Boolean = false,
     val alarmTriggeredAt: Long? = null,
     val sessionStartDisplayTime: Long = 0L,

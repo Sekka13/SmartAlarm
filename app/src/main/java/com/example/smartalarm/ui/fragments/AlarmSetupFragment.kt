@@ -18,6 +18,7 @@ import com.example.smartalarm.R
 import com.example.smartalarm.data.db.AppDatabase
 import com.example.smartalarm.data.model.AlarmConfig
 import com.example.smartalarm.data.repository.AlarmConfigRepository
+import com.example.smartalarm.domain.alarm.AlarmScheduleManager
 import com.google.android.material.chip.Chip
 import com.shawnlin.numberpicker.NumberPicker
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 import com.example.smartalarm.platform.alarm.AlarmSoundCatalog
+
 class AlarmSetupFragment : Fragment() {
 
     interface Listener {
@@ -52,11 +54,13 @@ class AlarmSetupFragment : Fragment() {
     private lateinit var buttonBack: ImageButton
     private lateinit var buttonSetAlarm: Button
 
+    private lateinit var textPickerTitle: TextView
     private lateinit var hourPicker: NumberPicker
     private lateinit var minutePicker: NumberPicker
     private lateinit var ampmPicker: NumberPicker
 
     private lateinit var spinnerSmartWindow: Spinner
+    private lateinit var textAlarmPreview: TextView
 
     private lateinit var chipMon: Chip
     private lateinit var chipTue: Chip
@@ -82,6 +86,7 @@ class AlarmSetupFragment : Fragment() {
     private var editingAlarm: AlarmConfig? = null
 
     private var availableSounds: List<AlarmSoundCatalog.AlarmSound> = emptyList()
+    private val alarmScheduleManager = AlarmScheduleManager()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,11 +133,13 @@ class AlarmSetupFragment : Fragment() {
         buttonBack = view.findViewById(R.id.button_back_alarm_setup)
         buttonSetAlarm = view.findViewById(R.id.button_set_alarm_setup)
 
+        textPickerTitle = view.findViewById(R.id.text_picker_title)
         hourPicker = view.findViewById(R.id.hourPicker)
         minutePicker = view.findViewById(R.id.minutePicker)
         ampmPicker = view.findViewById(R.id.ampmPicker)
 
         spinnerSmartWindow = view.findViewById(R.id.spinner_smart_window)
+        textAlarmPreview = view.findViewById(R.id.text_alarm_preview)
 
         chipMon = view.findViewById(R.id.chip_mon)
         chipTue = view.findViewById(R.id.chip_tue)
@@ -184,16 +191,8 @@ class AlarmSetupFragment : Fragment() {
     }
 
     private fun populateAlarmData(alarm: AlarmConfig) {
-        val hour12 = when {
-            alarm.hour24 == 0 -> 12
-            alarm.hour24 > 12 -> alarm.hour24 - 12
-            else -> alarm.hour24
-        }
-        val amPm = if (alarm.hour24 >= 12) 1 else 0
-
-        hourPicker.value = hour12
+        hourPicker.value = alarm.hour24
         minutePicker.value = alarm.minute
-        ampmPicker.value = amPm
 
         setSpinnerByLeadingInt(spinnerSmartWindow, alarm.smartWindowMinutes)
 
@@ -209,7 +208,9 @@ class AlarmSetupFragment : Fragment() {
         setSpinnerByLeadingInt(spinnerSnoozeMinutes, alarm.snoozeMinutes)
         setSpinnerByLeadingInt(spinnerSnoozeCount, alarm.snoozeMaxRepeats)
         updateSnoozeControls()
+        updateAlarmPreview()
     }
+
     private fun setSoundSpinnerByKey(soundKey: String) {
         val index = availableSounds.indexOfFirst { it.key == soundKey }
         if (index >= 0) {
@@ -226,6 +227,7 @@ class AlarmSetupFragment : Fragment() {
         chipFri.isChecked = "FRI" in days
         chipSat.isChecked = "SAT" in days
         chipSun.isChecked = "SUN" in days
+        updateAlarmPreview()
     }
 
     private fun setSpinnerByLeadingInt(spinner: Spinner, value: Int) {
@@ -249,15 +251,8 @@ class AlarmSetupFragment : Fragment() {
     }
 
     private fun saveAlarm() {
-        val selectedHour12 = hourPicker.value
         val selectedMinute = minutePicker.value
-        val selectedAmPm = ampmPicker.value
-
-        val selectedHour24 = when {
-            selectedAmPm == 0 && selectedHour12 == 12 -> 0
-            selectedAmPm == 1 && selectedHour12 != 12 -> selectedHour12 + 12
-            else -> selectedHour12
-        }
+        val selectedHour24 = getSelectedHour24()
 
         val repeatDays = buildRepeatDaysString()
 
@@ -312,26 +307,30 @@ class AlarmSetupFragment : Fragment() {
     }
 
     private fun setupTimePickers() {
+        textPickerTitle.text = "Set wake time (24h)"
+
+        hourPicker.minValue = 0
+        hourPicker.maxValue = 23
         hourPicker.wrapSelectorWheel = true
+        hourPicker.setFormatter { value ->
+            String.format(Locale.getDefault(), "%02d", value)
+        }
 
         minutePicker.wrapSelectorWheel = true
         minutePicker.setFormatter { value ->
             String.format(Locale.getDefault(), "%02d", value)
         }
 
-        val ampmValues = arrayOf("AM", "PM")
-        ampmPicker.minValue = 0
-        ampmPicker.maxValue = ampmValues.size - 1
-        ampmPicker.displayedValues = ampmValues
-        ampmPicker.wrapSelectorWheel = false
+        ampmPicker.visibility = View.GONE
+        ampmPicker.isEnabled = false
 
         val hapticListener = NumberPicker.OnValueChangeListener { picker, _, _ ->
             picker.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            updateAlarmPreview()
         }
 
         hourPicker.setOnValueChangedListener(hapticListener)
         minutePicker.setOnValueChangedListener(hapticListener)
-        ampmPicker.setOnValueChangedListener(hapticListener)
     }
 
     private fun populateInitialTime() {
@@ -339,16 +338,9 @@ class AlarmSetupFragment : Fragment() {
         val currentHour24 = calendar.get(Calendar.HOUR_OF_DAY)
         val currentMinute = calendar.get(Calendar.MINUTE)
 
-        val currentHour12 = when {
-            currentHour24 == 0 -> 12
-            currentHour24 > 12 -> currentHour24 - 12
-            else -> currentHour24
-        }
-        val currentAmPm = if (currentHour24 >= 12) 1 else 0
-
-        hourPicker.value = currentHour12
+        hourPicker.value = currentHour24
         minutePicker.value = currentMinute
-        ampmPicker.value = currentAmPm
+        updateAlarmPreview()
     }
 
     private fun setupSmartWindowSection() {
@@ -362,6 +354,9 @@ class AlarmSetupFragment : Fragment() {
         chips.forEach { chip ->
             chip.isCheckable = true
             chip.isChecked = false
+            chip.setOnCheckedChangeListener { _, _ ->
+                updateAlarmPreview()
+            }
         }
     }
 
@@ -440,5 +435,34 @@ class AlarmSetupFragment : Fragment() {
         ).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
+    }
+
+    private fun updateAlarmPreview() {
+        if (!::hourPicker.isInitialized || !::minutePicker.isInitialized || !::ampmPicker.isInitialized) {
+            return
+        }
+
+        val previewAlarm = AlarmConfig(
+            id = editingAlarm?.id ?: 0,
+            hour24 = getSelectedHour24(),
+            minute = minutePicker.value,
+            smartWindowMinutes = editingAlarm?.smartWindowMinutes ?: 30,
+            repeatDays = buildRepeatDaysString(),
+            soundName = editingAlarm?.soundName ?: "",
+            volumePercent = editingAlarm?.volumePercent ?: 80,
+            vibrationMode = editingAlarm?.vibrationMode ?: "Normal",
+            snoozeEnabled = editingAlarm?.snoozeEnabled ?: true,
+            snoozeMinutes = editingAlarm?.snoozeMinutes ?: 10,
+            snoozeMaxRepeats = editingAlarm?.snoozeMaxRepeats ?: 1,
+            isEnabled = true,
+            isSelected = editingAlarm?.isSelected ?: false,
+            createdAt = editingAlarm?.createdAt ?: System.currentTimeMillis()
+        )
+
+        textAlarmPreview.text = alarmScheduleManager.buildSetupPreview(previewAlarm)
+    }
+
+    private fun getSelectedHour24(): Int {
+        return hourPicker.value.coerceIn(0, 23)
     }
 }

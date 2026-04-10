@@ -2,6 +2,7 @@ package com.example.smartalarm.data.repository
 
 import android.content.Context
 import com.example.smartalarm.data.model.SleepSession
+import com.example.smartalarm.domain.session.SessionReplayMode
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -22,11 +23,11 @@ class ExportRepository {
 
         val builder = StringBuilder()
 
-        builder.append("start,end,bpmMin,bpmMax,bpmAvg\n")
+        builder.append("start,end,replayMode,bpmMin,bpmMax,bpmAvg\n")
 
         for (s in sessions) {
 
-            builder.append("${formatter.format(Date(s.startTime))},${formatter.format(Date(s.endTime))},${s.bpmMin},${s.bpmMax},${s.bpmAvg}\n")
+            builder.append("${formatter.format(Date(s.startTime))},${formatter.format(Date(s.endTime))},${SessionReplayMode.displayNameFromStoredValue(s.replayMode)},${s.bpmMin},${s.bpmMax},${s.bpmAvg}\n")
         }
 
         file.writeText(builder.toString())
@@ -44,6 +45,7 @@ class ExportRepository {
 
             obj.put("start", formatter.format(Date(s.startTime)))
             obj.put("end", formatter.format(Date(s.endTime)))
+            obj.put("replayMode", SessionReplayMode.displayNameFromStoredValue(s.replayMode))
             obj.put("bpmMin", s.bpmMin)
             obj.put("bpmMax", s.bpmMax)
             obj.put("bpmAvg", s.bpmAvg)

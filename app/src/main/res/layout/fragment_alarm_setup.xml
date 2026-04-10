@@ -108,6 +108,16 @@
                         app:np_wheelItemCount="5"
                         app:np_dividerColor="@android:color/transparent" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/text_alarm_preview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="Alarm will ring in --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
